@@ -1029,7 +1029,7 @@
                         <span id="side-breakdown-label"><i class="fa-solid fa-list-check"></i> Ward Breakdown</span>
                         <span id="side-breakdown-count" style="font-size: 11px; background: rgba(59,130,246,0.2); padding: 1px 6px; border-radius: 10px; color: #93c5fd;">-- Wards</span>
                     </h4>
-                    <div id="side-ward-list" style="max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+                    <div id="side-ward-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
                         <!-- Dynamically generated rows -->
                     </div>
                 </div>
@@ -1582,11 +1582,15 @@
                 let isDistrictLevel = false;
 
                 if (isMetro) {
-                    breakdownLabel.innerHTML = `<i class="fa-solid fa-map-location-dot"></i> District Breakdown`;
+                    breakdownLabel.innerHTML = `<i class="fa-solid fa-map-location-dot"></i> District Overview Breakdown`;
                     listData = districtData.map(d => ({
                         id: d.Code_Vung,
                         name: d.District_Name,
                         aqi: d.aqi,
+                        lst: d.lst,
+                        green_space: d.green_space,
+                        waste: d.waste,
+                        Area_km2: d.Area_km2,
                         vulnerability: d.vulnerability,
                         raw: d
                     }));
@@ -1608,6 +1612,10 @@
                             id: w.maXa,
                             name: w.tenXa,
                             aqi: w.aqi,
+                            lst: w.lst,
+                            green_space: w.green_space,
+                            waste: w.waste,
+                            Area_km2: w.Area_km2,
                             vulnerability: w.vulnerability,
                             raw: w
                         }));
@@ -1627,7 +1635,7 @@
                         isSelected = true;
                     }
 
-                    row.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: ${isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${isSelected ? 'rgba(59, 130, 246, 0.4)' : 'transparent'}; border-radius: 4px; cursor: pointer; transition: all 0.2s; font-size: 12px;`;
+                    row.style.cssText = `display: flex; flex-direction: column; padding: 10px; background: ${isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${isSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255,255,255,0.05)'}; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px; gap: 5px;`;
                     
                     row.onmouseover = () => { row.style.background = 'rgba(59, 130, 246, 0.1)'; };
                     row.onmouseout = () => { 
@@ -1654,20 +1662,23 @@
                         }
                     };
 
-                    let badgeHTML = '';
-                    if (currentTheme === 'env') {
-                        badgeHTML = `<span style="font-weight: 600; color: #60a5fa;">AQI ${item.aqi}</span>`;
-                    } else {
-                        let vulnColor = '#10b981';
-                        if (item.vulnerability > 70) vulnColor = '#ef4444';
-                        else if (item.vulnerability > 50) vulnColor = '#f97316';
-                        else if (item.vulnerability > 30) vulnColor = '#eab308';
-                        badgeHTML = `<span style="font-weight: 700; color: ${vulnColor};">Vuln ${item.vulnerability}</span>`;
-                    }
+                    let statusText = "Good";
+                    let statusColor = "#10b981";
+                    if (item.aqi >= 120) { statusText = "Severe"; statusColor = "#ef4444"; }
+                    else if (item.aqi >= 100) { statusText = "Sensitive"; statusColor = "#f97316"; }
+                    else if (item.aqi >= 80) { statusText = "Moderate"; statusColor = "#eab308"; }
 
                     row.innerHTML = `
-                        <span style="color: #e2e8f0; font-weight: 500;">${item.name}</span>
-                        ${badgeHTML}
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span style="color: #f3f4f6; font-weight: 600; font-size: 13px;">${item.name}</span>
+                            <span style="font-weight: 700; color: ${statusColor}; font-size: 10px; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">AQI ${item.aqi} (${statusText})</span>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: #9ca3af; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 5px; line-height: 1.4;">
+                            <span style="white-space: nowrap;"><i class="fa-solid fa-temperature-high" style="color:#f97316;"></i> LST: <strong>${item.lst}°C</strong></span>
+                            <span style="white-space: nowrap;"><i class="fa-solid fa-leaf" style="color:#10b981;"></i> Green: <strong>${(item.green_space || 0).toFixed(1)}%</strong></span>
+                            <span style="white-space: nowrap;"><i class="fa-solid fa-trash-can" style="color:#a78bfa;"></i> Waste: <strong>${item.waste} T/D</strong></span>
+                            <span style="white-space: nowrap;"><i class="fa-solid fa-chart-area" style="color:#60a5fa;"></i> Area: <strong>${item.Area_km2.toFixed(2)} km²</strong></span>
+                        </div>
                     `;
                     breakdownList.appendChild(row);
                 });
