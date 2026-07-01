@@ -841,16 +841,17 @@
         <div class="header-title-container">
             <i class="fa-solid fa-earth-asia header-logo"></i>
             <div>
-                <h1>Hanoi Urban Ecosystem Portal</h1>
-                <p style="font-size: 11px; color: var(--text-muted);">Land Cover, Environmental Quality, & Urban
-                    Pressure Metrics (2024)</p>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <h1>Hanoi Urban Ecosystem Portal</h1>
+                    <span id="live-badge" class="header-tag" style="background: rgba(156, 163, 175, 0.15); border-color: var(--text-muted); color: var(--text-muted);">Static</span>
+                </div>
+                <p style="font-size: 11px; color: var(--text-muted);" id="header-timestamp">Land Cover, Environmental Quality, & Urban Pressure Metrics (2024)</p>
             </div>
-            <span class="header-tag">Interactive</span>
         </div>
         <div class="header-actions">
             <a href="data/hanoi_lulc_district_areas.csv" class="btn" download><i class="fa-solid fa-file-csv"></i>
                 Export CSV Data</a>
-            <a href="https://github.com/TungDucVu/VNSC-Intern" target="_blank" class="btn btn-primary"><i
+            <a href="https://github.com/TungDucVu/Dashboard_Hanoi" target="_blank" class="btn btn-primary"><i
                     class="fa-brands fa-github"></i> Repository</a>
         </div>
     </header>
@@ -1643,6 +1644,14 @@
 
         // Initialize Main Section Tab Charts
         function initMainCharts() {
+            // Destroy existing charts to prevent canvas reuse errors
+            if (chartLulcBar) chartLulcBar.destroy();
+            if (chartLulcPie) chartLulcPie.destroy();
+            if (chartEnvLst) chartEnvLst.destroy();
+            if (chartEnvWaste) chartEnvWaste.destroy();
+            if (chartUrbanDensity) chartUrbanDensity.destroy();
+            if (chartUrbanScatter) chartUrbanScatter.destroy();
+
             // Sort data by metrics for ranking charts
             const sortedUrbanization = [...lulcData].map(d => {
                 return { name: d.District_Name, val: (d.Urban_Area_km2 / d.Total_LULC_Area_km2) * 100 };
@@ -2129,10 +2138,62 @@
             evt.currentTarget.classList.add('active');
         }
 
+        // Asynchronous Real-Time Data Loader
+        async function loadRealtimeData() {
+            try {
+                const response = await fetch('data/realtime_metrics.json');
+                if (!response.ok) throw new Error("Metrics file not found or inaccessible");
+                const realtime = await response.json();
+                
+                // Update metropolitan metrics
+                if (realtime.metro) {
+                    if (realtime.metro.aqi !== undefined) metroTotals.aqi = realtime.metro.aqi;
+                    if (realtime.metro.lst !== undefined) metroTotals.lst = realtime.metro.lst.toFixed(1);
+                    // Also store other live weather values in metroTotals
+                    if (realtime.metro.air_temp !== undefined) metroTotals.air_temp = realtime.metro.air_temp;
+                    if (realtime.metro.rain_mm !== undefined) metroTotals.rain_mm = realtime.metro.rain_mm;
+                }
+                
+                // Update district-specific metrics
+                if (realtime.districts) {
+                    for (const [name, metrics] of Object.entries(realtime.districts)) {
+                        const record = lulcData.find(d => d.District_Name === name);
+                        if (record) {
+                            if (metrics.aqi !== undefined) record.aqi = metrics.aqi;
+                            if (metrics.lst !== undefined) record.lst = metrics.lst;
+                            if (metrics.flood_points !== undefined) record.flood_points = metrics.flood_points;
+                        }
+                    }
+                }
+                
+                // Update live badge in header
+                const liveBadge = document.getElementById('live-badge');
+                if (liveBadge) {
+                    liveBadge.innerText = "Live";
+                    liveBadge.style.background = "rgba(16, 185, 129, 0.15)";
+                    liveBadge.style.borderColor = "var(--success)";
+                    liveBadge.style.color = "#10b981";
+                }
+                
+                const headerTime = document.getElementById('header-timestamp');
+                if (headerTime && realtime.last_updated) {
+                    const localTime = new Date(realtime.last_updated).toLocaleString();
+                    headerTime.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i> Hourly Live Data (Last Update: ${localTime})`;
+                }
+                
+                console.log("Realtime metrics synced successfully!");
+            } catch (err) {
+                console.warn("Realtime fetch failed; using built-in statistics.", err);
+            } finally {
+                // Refresh dashboard views and update charts with the latest data
+                switchTheme(currentTheme);
+                initMainCharts();
+            }
+        }
+
         // Run Initialization
-        switchTheme('lulc');
-        initMainCharts();
         renderTable();
+        loadRealtimeData();
 
     </script>
 </body>
