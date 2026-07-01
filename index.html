@@ -1193,7 +1193,8 @@
             { "Code_Vung": 1016, "District_Name": "Soc Son", "Water_Area_km2": 11.6512141283, "Urban_Area_km2": 52.5364153469, "Agriculture_Area_km2": 90.1112421657, "Greenery_Area_km2": 140.5369799168, "Bare_Land_Area_km2": 9.2128860523, "Total_LULC_Area_km2": 304.0487376101, "aqi": 75, "lst": 30.5, "waste": 240, "pop_density": 1100, "flood_points": 1 },
             { "Code_Vung": 1017, "District_Name": "Dong Anh", "Water_Area_km2": 13.0818304733, "Urban_Area_km2": 49.4663372718, "Agriculture_Area_km2": 46.4603976831, "Greenery_Area_km2": 72.4292889371, "Bare_Land_Area_km2": 9.0238954203, "Total_LULC_Area_km2": 190.4617497856, "aqi": 108, "lst": 33.5, "waste": 380, "pop_density": 2100, "flood_points": 3 },
             { "Code_Vung": 1018, "District_Name": "Gia Lam", "Water_Area_km2": 12.2781385455, "Urban_Area_km2": 30.1604884323, "Agriculture_Area_km2": 17.6083663229, "Greenery_Area_km2": 53.1619264689, "Bare_Land_Area_km2": 5.1786600151, "Total_LULC_Area_km2": 118.3875797847, "aqi": 105, "lst": 34.0, "waste": 320, "pop_density": 2800, "flood_points": 3 },
-            { "Code_Vung": 1019, "District_Name": "Tu Liem", "Water_Area_km2": 5.2542419313, "Urban_Area_km2": 28.7224893896, "Agriculture_Area_km2": 7.8538660262, "Greenery_Area_km2": 25.8050670716, "Bare_Land_Area_km2": 7.0814947531, "Total_LULC_Area_km2": 74.7171591719, "aqi": 125, "lst": 36.8, "waste": 450, "pop_density": 6800, "flood_points": 8 },
+            { "Code_Vung": 1021, "District_Name": "Bac Tu Liem", "Water_Area_km2": 3.1025419313, "Urban_Area_km2": 15.2224893896, "Agriculture_Area_km2": 4.8038660262, "Greenery_Area_km2": 15.6050670716, "Bare_Land_Area_km2": 4.6160355813, "Total_LULC_Area_km2": 43.35, "aqi": 120, "lst": 35.8, "waste": 240, "pop_density": 7800, "flood_points": 5 },
+            { "Code_Vung": 1022, "District_Name": "Nam Tu Liem", "Water_Area_km2": 2.1517, "Urban_Area_km2": 13.5, "Agriculture_Area_km2": 3.05, "Greenery_Area_km2": 10.2, "Bare_Land_Area_km2": 2.4654591718, "Total_LULC_Area_km2": 31.3671591719, "aqi": 128, "lst": 36.4, "waste": 210, "pop_density": 8300, "flood_points": 4 },
             { "Code_Vung": 1020, "District_Name": "Thanh Tri", "Water_Area_km2": 6.5335646579, "Urban_Area_km2": 26.0810914042, "Agriculture_Area_km2": 12.9153439391, "Greenery_Area_km2": 20.2311605592, "Bare_Land_Area_km2": 4.680888071, "Total_LULC_Area_km2": 70.4420486313, "aqi": 115, "lst": 34.8, "waste": 220, "pop_density": 4500, "flood_points": 6 },
             { "Code_Vung": 1250, "District_Name": "Me Linh", "Water_Area_km2": 13.687983218, "Urban_Area_km2": 27.2627693875, "Agriculture_Area_km2": 39.0215266086, "Greenery_Area_km2": 58.4790291131, "Bare_Land_Area_km2": 5.1532953404, "Total_LULC_Area_km2": 143.6046036677, "aqi": 95, "lst": 32.6, "waste": 180, "pop_density": 1700, "flood_points": 2 },
             { "Code_Vung": 1268, "District_Name": "Ha Dong", "Water_Area_km2": 0.9483886395, "Urban_Area_km2": 17.2212236958, "Agriculture_Area_km2": 3.9251588497, "Greenery_Area_km2": 9.0194060691, "Bare_Land_Area_km2": 3.0527444529, "Total_LULC_Area_km2": 34.1669217069, "aqi": 128, "lst": 37.8, "waste": 580, "pop_density": 8200, "flood_points": 9 },
@@ -1274,19 +1275,10 @@
             maxZoom: 20
         });
 
-        // LULC PNG Overlay
-        const bounds = [[20.565141830000048, 105.28470698200006], [21.385984408000095, 106.01836448300003]];
-        const lulcOverlay = L.imageOverlay('data/hanoi_lulc_2024.png', bounds, {
-            opacity: 0.7,
-            interactive: false
-        }).addTo(map);
-
         L.control.layers({
             "Dark Vector": darkBasemap,
             "Satellite Imagery": satelliteBasemap
-        }, {
-            "LULC 2024 Raster Overlay": lulcOverlay
-        }, { collapsed: true, position: 'topright' }).addTo(map);
+        }, {}, { collapsed: true, position: 'topright' }).addTo(map);
 
         // Map Legends (Dynamic)
         const legendControl = L.control({ position: 'bottomleft' });
@@ -2093,15 +2085,11 @@
                 geojsonLayer.setStyle(styleFeature);
             }
 
-            // Show / Hide Raster Image Overlay (Hide for thematic choropleths to improve clarity, keep selectable)
             if (theme === 'lulc') {
-                lulcOverlay.setOpacity(0.7);
                 document.getElementById('map-title-text').innerHTML = `<i class="fa-solid fa-map-location-dot"></i> Hanoi LULC Classification Map (2024)`;
             } else if (theme === 'env') {
-                lulcOverlay.setOpacity(0.08); // faint background
                 document.getElementById('map-title-text').innerHTML = `<i class="fa-solid fa-wind"></i> Air Quality Index (AQI) Choropleth Map`;
             } else if (theme === 'urban') {
-                lulcOverlay.setOpacity(0.08); // faint background
                 document.getElementById('map-title-text').innerHTML = `<i class="fa-solid fa-city"></i> Built-up Concretization Rate Choropleth Map`;
             }
 
