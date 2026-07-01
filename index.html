@@ -363,6 +363,18 @@
             box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
         }
 
+        .vuln-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            color: #ffffff;
+            display: inline-block;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+
         .panel-content-tab {
             display: none;
             flex-direction: column;
@@ -925,7 +937,10 @@
             <div class="side-panel">
                 <div class="panel-header">
                     <div>
-                        <h3 id="panel-title" class="panel-title">Hanoi Overview</h3>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 id="panel-title" class="panel-title">Hanoi Overview</h3>
+                            <span id="panel-vulnerability-badge" class="vuln-badge">VULN: --</span>
+                        </div>
                         <p id="panel-subtitle" class="panel-subtitle">Aggregated metropolitan statistics</p>
                     </div>
                     <button id="btn-reset" class="btn-reset-selection" onclick="selectDistrict(null)" style="display:none;">
@@ -948,6 +963,10 @@
                         <span class="stat-value" id="env-lst-val">-- °C</span>
                     </div>
                     <div class="stat-row">
+                        <span class="stat-label"><i class="fa-solid fa-tree"></i> Green Space Ratio</span>
+                        <span class="stat-value" id="env-green-val">-- %</span>
+                    </div>
+                    <div class="stat-row">
                         <span class="stat-label"><i class="fa-solid fa-trash-can"></i> Solid Waste Collected</span>
                         <span class="stat-value" id="env-waste-val">-- tons/day</span>
                     </div>
@@ -956,8 +975,16 @@
                 <!-- Dynamic Content for Tab 3: Urban Pressure -->
                 <div id="side-content-urban" class="panel-content-tab">
                     <div class="stat-row">
+                        <span class="stat-label"><i class="fa-solid fa-people-arrows"></i> Total Population</span>
+                        <span class="stat-value" id="urban-pop-val">-- people</span>
+                    </div>
+                    <div class="stat-row">
                         <span class="stat-label"><i class="fa-solid fa-users"></i> Population Density</span>
                         <span class="stat-value" id="urban-density-val">-- people/km²</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label"><i class="fa-solid fa-city"></i> Built-up Area Ratio</span>
+                        <span class="stat-value" id="urban-built-val">-- %</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label"><i class="fa-solid fa-cloud-showers-water"></i> Flood Points</span>
@@ -1085,39 +1112,56 @@
 
     <!-- Interactive Logic Script -->
     <script>
+        // Helper to calculate vulnerability score dynamically
+        function calcVulnerability(aqi, lst, floods, density, builtUp, green) {
+            const aqi_s = Math.max(0, Math.min(100, (aqi - 50) / 100 * 100));
+            const lst_s = Math.max(0, Math.min(100, (lst - 25) / 15 * 100));
+            const flood_s = Math.max(0, Math.min(100, floods / 15 * 100));
+            const dens_s = Math.max(0, Math.min(100, density / 25000 * 100));
+            const built_s = builtUp;
+            const green_s = 100 - green;
+            
+            const score = 0.20 * aqi_s + 0.20 * lst_s + 0.20 * flood_s + 0.15 * dens_s + 0.15 * built_s + 0.10 * green_s;
+            return Math.round(Math.max(1, Math.min(100, score)));
+        }
+
         // 1. Data Database (Augmented with Env & Urban metrics)
         const districtData = [
-            { "Code_Vung": 1001, "District_Name": "Ba Dinh", "Area_km2": 11.46, "aqi": 132, "lst": 37.6, "waste": 420, "pop_density": 24200, "flood_points": 8 },
-            { "Code_Vung": 1002, "District_Name": "Hoan Kiem", "Area_km2": 5.93, "aqi": 135, "lst": 38.2, "waste": 220, "pop_density": 25800, "flood_points": 6 },
-            { "Code_Vung": 1003, "District_Name": "Tay Ho", "Area_km2": 27.72, "aqi": 110, "lst": 33.5, "waste": 250, "pop_density": 6300, "flood_points": 4 },
-            { "Code_Vung": 1004, "District_Name": "Long Bien", "Area_km2": 56.9, "aqi": 118, "lst": 35.6, "waste": 410, "pop_density": 5700, "flood_points": 5 },
-            { "Code_Vung": 1005, "District_Name": "Cau Giay", "Area_km2": 15.91, "aqi": 145, "lst": 39.1, "waste": 510, "pop_density": 23500, "flood_points": 12 },
-            { "Code_Vung": 1006, "District_Name": "Dong Da", "Area_km2": 9.15, "aqi": 142, "lst": 39.5, "waste": 650, "pop_density": 37800, "flood_points": 14 },
-            { "Code_Vung": 1007, "District_Name": "Hai Ba Trung", "Area_km2": 12.87, "aqi": 138, "lst": 38.9, "waste": 490, "pop_density": 29500, "flood_points": 7 },
-            { "Code_Vung": 1008, "District_Name": "Hoang Mai", "Area_km2": 37.98, "aqi": 136, "lst": 38.5, "waste": 620, "pop_density": 11200, "flood_points": 15 },
-            { "Code_Vung": 1009, "District_Name": "Thanh Xuan", "Area_km2": 8.35, "aqi": 140, "lst": 39.4, "waste": 480, "pop_density": 31200, "flood_points": 11 },
-            { "Code_Vung": 1016, "District_Name": "Soc Son", "Area_km2": 304.05, "aqi": 75, "lst": 30.5, "waste": 240, "pop_density": 1100, "flood_points": 1 },
-            { "Code_Vung": 1017, "District_Name": "Dong Anh", "Area_km2": 190.46, "aqi": 108, "lst": 33.5, "waste": 380, "pop_density": 2100, "flood_points": 3 },
-            { "Code_Vung": 1018, "District_Name": "Gia Lam", "Area_km2": 118.39, "aqi": 105, "lst": 34.0, "waste": 320, "pop_density": 2800, "flood_points": 3 },
-            { "Code_Vung": 1021, "District_Name": "Bac Tu Liem", "Area_km2": 43.35, "aqi": 120, "lst": 35.8, "waste": 240, "pop_density": 7800, "flood_points": 5 },
-            { "Code_Vung": 1022, "District_Name": "Nam Tu Liem", "Area_km2": 31.37, "aqi": 128, "lst": 36.4, "waste": 210, "pop_density": 8300, "flood_points": 4 },
-            { "Code_Vung": 1020, "District_Name": "Thanh Tri", "Area_km2": 70.44, "aqi": 115, "lst": 34.8, "waste": 220, "pop_density": 4500, "flood_points": 6 },
-            { "Code_Vung": 1250, "District_Name": "Me Linh", "Area_km2": 143.6, "aqi": 95, "lst": 32.6, "waste": 180, "pop_density": 1700, "flood_points": 2 },
-            { "Code_Vung": 1268, "District_Name": "Ha Dong", "Area_km2": 34.17, "aqi": 128, "lst": 37.8, "waste": 580, "pop_density": 8200, "flood_points": 9 },
-            { "Code_Vung": 1269, "District_Name": "Son Tay", "Area_km2": 122.74, "aqi": 88, "lst": 31.2, "waste": 110, "pop_density": 1500, "flood_points": 1 },
-            { "Code_Vung": 1271, "District_Name": "Ba Vi", "Area_km2": 419.17, "aqi": 65, "lst": 28.5, "waste": 200, "pop_density": 680, "flood_points": 1 },
-            { "Code_Vung": 1272, "District_Name": "Phuc Tho", "Area_km2": 118.51, "aqi": 78, "lst": 31.5, "waste": 110, "pop_density": 1600, "flood_points": 1 },
-            { "Code_Vung": 1273, "District_Name": "Dan Phuong", "Area_km2": 72.79, "aqi": 82, "lst": 32.2, "waste": 95, "pop_density": 2400, "flood_points": 1 },
-            { "Code_Vung": 1274, "District_Name": "Hoai Duc", "Area_km2": 83.94, "aqi": 112, "lst": 33.8, "waste": 210, "pop_density": 3200, "flood_points": 4 },
-            { "Code_Vung": 1275, "District_Name": "Quoc Oai", "Area_km2": 151.25, "aqi": 80, "lst": 31.8, "waste": 150, "pop_density": 1500, "flood_points": 1 },
-            { "Code_Vung": 1276, "District_Name": "Thach That", "Area_km2": 172.83, "aqi": 85, "lst": 32.5, "waste": 190, "pop_density": 1800, "flood_points": 2 },
-            { "Code_Vung": 1277, "District_Name": "Chuong My", "Area_km2": 229.3, "aqi": 82, "lst": 31.2, "waste": 220, "pop_density": 1400, "flood_points": 2 },
-            { "Code_Vung": 1278, "District_Name": "Thanh Oai", "Area_km2": 125.96, "aqi": 88, "lst": 32.8, "waste": 140, "pop_density": 1600, "flood_points": 2 },
-            { "Code_Vung": 1279, "District_Name": "Thuong Tin", "Area_km2": 139.87, "aqi": 92, "lst": 33.2, "waste": 180, "pop_density": 2000, "flood_points": 2 },
-            { "Code_Vung": 1280, "District_Name": "Phu Xuyen", "Area_km2": 180.15, "aqi": 85, "lst": 32.0, "waste": 120, "pop_density": 1300, "flood_points": 1 },
-            { "Code_Vung": 1281, "District_Name": "Ung Hoa", "Area_km2": 179.12, "aqi": 78, "lst": 31.5, "waste": 130, "pop_density": 1200, "flood_points": 1 },
-            { "Code_Vung": 1282, "District_Name": "My Duc", "Area_km2": 235.32, "aqi": 70, "lst": 29.8, "waste": 130, "pop_density": 950, "flood_points": 1 }
+            { "Code_Vung": 1001, "District_Name": "Ba Dinh", "Area_km2": 11.46, "aqi": 132, "lst": 37.6, "waste": 420, "pop_density": 24200, "flood_points": 8, "green_space": 15, "built_up": 80 },
+            { "Code_Vung": 1002, "District_Name": "Hoan Kiem", "Area_km2": 5.93, "aqi": 135, "lst": 38.2, "waste": 220, "pop_density": 25800, "flood_points": 6, "green_space": 12, "built_up": 85 },
+            { "Code_Vung": 1003, "District_Name": "Tay Ho", "Area_km2": 27.72, "aqi": 110, "lst": 33.5, "waste": 250, "pop_density": 6300, "flood_points": 4, "green_space": 35, "built_up": 55 },
+            { "Code_Vung": 1004, "District_Name": "Long Bien", "Area_km2": 56.9, "aqi": 118, "lst": 35.6, "waste": 410, "pop_density": 5700, "flood_points": 5, "green_space": 30, "built_up": 58 },
+            { "Code_Vung": 1005, "District_Name": "Cau Giay", "Area_km2": 15.91, "aqi": 145, "lst": 39.1, "waste": 510, "pop_density": 23500, "flood_points": 12, "green_space": 18, "built_up": 78 },
+            { "Code_Vung": 1006, "District_Name": "Dong Da", "Area_km2": 9.15, "aqi": 142, "lst": 39.5, "waste": 650, "pop_density": 37800, "flood_points": 14, "green_space": 10, "built_up": 88 },
+            { "Code_Vung": 1007, "District_Name": "Hai Ba Trung", "Area_km2": 12.87, "aqi": 138, "lst": 38.9, "waste": 490, "pop_density": 29500, "flood_points": 7, "green_space": 14, "built_up": 82 },
+            { "Code_Vung": 1008, "District_Name": "Hoang Mai", "Area_km2": 37.98, "aqi": 136, "lst": 38.5, "waste": 620, "pop_density": 11200, "flood_points": 15, "green_space": 22, "built_up": 68 },
+            { "Code_Vung": 1009, "District_Name": "Thanh Xuan", "Area_km2": 8.35, "aqi": 140, "lst": 39.4, "waste": 480, "pop_density": 31200, "flood_points": 11, "green_space": 11, "built_up": 86 },
+            { "Code_Vung": 1016, "District_Name": "Soc Son", "Area_km2": 304.05, "aqi": 75, "lst": 30.5, "waste": 240, "pop_density": 1100, "flood_points": 1, "green_space": 68, "built_up": 18 },
+            { "Code_Vung": 1017, "District_Name": "Dong Anh", "Area_km2": 190.46, "aqi": 108, "lst": 33.5, "waste": 380, "pop_density": 2100, "flood_points": 3, "green_space": 42, "built_up": 35 },
+            { "Code_Vung": 1018, "District_Name": "Gia Lam", "Area_km2": 118.39, "aqi": 105, "lst": 34.0, "waste": 320, "pop_density": 2800, "flood_points": 3, "green_space": 38, "built_up": 38 },
+            { "Code_Vung": 1021, "District_Name": "Bac Tu Liem", "Area_km2": 43.35, "aqi": 120, "lst": 35.8, "waste": 240, "pop_density": 7800, "flood_points": 5, "green_space": 25, "built_up": 62 },
+            { "Code_Vung": 1022, "District_Name": "Nam Tu Liem", "Area_km2": 31.37, "aqi": 128, "lst": 36.4, "waste": 210, "pop_density": 8300, "flood_points": 4, "green_space": 22, "built_up": 65 },
+            { "Code_Vung": 1020, "District_Name": "Thanh Tri", "Area_km2": 70.44, "aqi": 115, "lst": 34.8, "waste": 220, "pop_density": 4500, "flood_points": 6, "green_space": 30, "built_up": 52 },
+            { "Code_Vung": 1250, "District_Name": "Me Linh", "Area_km2": 143.6, "aqi": 95, "lst": 32.6, "waste": 180, "pop_density": 1700, "flood_points": 2, "green_space": 48, "built_up": 28 },
+            { "Code_Vung": 1268, "District_Name": "Ha Dong", "Area_km2": 34.17, "aqi": 128, "lst": 37.8, "waste": 580, "pop_density": 8200, "flood_points": 9, "green_space": 20, "built_up": 72 },
+            { "Code_Vung": 1269, "District_Name": "Son Tay", "Area_km2": 122.74, "aqi": 88, "lst": 31.2, "waste": 110, "pop_density": 1500, "flood_points": 1, "green_space": 52, "built_up": 25 },
+            { "Code_Vung": 1271, "District_Name": "Ba Vi", "Area_km2": 419.17, "aqi": 65, "lst": 28.5, "waste": 200, "pop_density": 680, "flood_points": 1, "green_space": 78, "built_up": 10 },
+            { "Code_Vung": 1272, "District_Name": "Phuc Tho", "Area_km2": 118.51, "aqi": 78, "lst": 31.5, "waste": 110, "pop_density": 1600, "flood_points": 1, "green_space": 55, "built_up": 22 },
+            { "Code_Vung": 1273, "District_Name": "Dan Phuong", "Area_km2": 72.79, "aqi": 82, "lst": 32.2, "waste": 95, "pop_density": 2400, "flood_points": 1, "green_space": 45, "built_up": 32 },
+            { "Code_Vung": 1274, "District_Name": "Hoai Duc", "Area_km2": 83.94, "aqi": 112, "lst": 33.8, "waste": 210, "pop_density": 3200, "flood_points": 4, "green_space": 32, "built_up": 50 },
+            { "Code_Vung": 1275, "District_Name": "Quoc Oai", "Area_km2": 151.25, "aqi": 80, "lst": 31.8, "waste": 150, "pop_density": 1500, "flood_points": 1, "green_space": 50, "built_up": 28 },
+            { "Code_Vung": 1276, "District_Name": "Thach That", "Area_km2": 172.83, "aqi": 85, "lst": 32.5, "waste": 190, "pop_density": 1800, "flood_points": 2, "green_space": 52, "built_up": 25 },
+            { "Code_Vung": 1277, "District_Name": "Chuong My", "Area_km2": 229.3, "aqi": 82, "lst": 31.2, "waste": 220, "pop_density": 1400, "flood_points": 2, "green_space": 55, "built_up": 22 },
+            { "Code_Vung": 1278, "District_Name": "Thanh Oai", "Area_km2": 125.96, "aqi": 88, "lst": 32.8, "waste": 140, "pop_density": 1600, "flood_points": 2, "green_space": 48, "built_up": 26 },
+            { "Code_Vung": 1279, "District_Name": "Thuong Tin", "Area_km2": 139.87, "aqi": 92, "lst": 33.2, "waste": 180, "pop_density": 2000, "flood_points": 2, "green_space": 44, "built_up": 34 },
+            { "Code_Vung": 1280, "District_Name": "Phu Xuyen", "Area_km2": 180.15, "aqi": 85, "lst": 32.0, "waste": 120, "pop_density": 1300, "flood_points": 1, "green_space": 52, "built_up": 20 },
+            { "Code_Vung": 1281, "District_Name": "Ung Hoa", "Area_km2": 179.12, "aqi": 78, "lst": 31.5, "waste": 130, "pop_density": 1200, "flood_points": 1, "green_space": 58, "built_up": 16 },
+            { "Code_Vung": 1282, "District_Name": "My Duc", "Area_km2": 235.32, "aqi": 70, "lst": 29.8, "waste": 130, "pop_density": 950, "flood_points": 1, "green_space": 72, "built_up": 12 }
         ];
+
+        districtData.forEach(d => {
+            d.vulnerability = calcVulnerability(d.aqi, d.lst, d.flood_points, d.pop_density, d.built_up, d.green_space);
+        });
 
         // 2. Metropolitan Calculations
         const metroTotals = {
@@ -1129,7 +1173,10 @@
             waste: 0,
             pop_density: 0,
             flood_points: 0,
-            population: 0
+            population: 0,
+            green_space: 0,
+            built_up: 0,
+            vulnerability: 0
         };
 
         districtData.forEach(d => {
@@ -1139,12 +1186,17 @@
             metroTotals.waste += d.waste;
             metroTotals.flood_points += d.flood_points;
             metroTotals.population += (d.pop_density * d.Area_km2);
+            metroTotals.green_space += (d.green_space * d.Area_km2);
+            metroTotals.built_up += (d.built_up * d.Area_km2);
         });
 
         // Compute averages
         metroTotals.aqi = Math.round(metroTotals.aqi / districtData.length);
         metroTotals.lst = (metroTotals.lst / districtData.length).toFixed(1);
         metroTotals.pop_density = Math.round(metroTotals.population / metroTotals.total);
+        metroTotals.green_space = Math.round(metroTotals.green_space / metroTotals.total);
+        metroTotals.built_up = Math.round(metroTotals.built_up / metroTotals.total);
+        metroTotals.vulnerability = calcVulnerability(metroTotals.aqi, parseFloat(metroTotals.lst), metroTotals.flood_points, metroTotals.pop_density, metroTotals.built_up, metroTotals.green_space);
 
         // 3. Tab Theme Control State
         let currentTheme = 'env';
@@ -1306,9 +1358,9 @@
             if (record) {
                 let hoverHTML = `<strong>${record.District_Name}</strong>`;
                 if (currentTheme === 'env') {
-                    hoverHTML += `<br/>Avg AQI: ${record.aqi}<br/>Avg Summer LST: ${record.lst}°C`;
+                    hoverHTML += `<br/>Avg AQI: ${record.aqi}<br/>Avg Summer LST: ${record.lst}°C<br/>Green Space: ${record.green_space}%`;
                 } else {
-                    hoverHTML += `<br/>Avg Density: ${record.pop_density.toLocaleString()} /km²<br/>Total Flood Points: ${record.flood_points}`;
+                    hoverHTML += `<br/>Avg Density: ${record.pop_density.toLocaleString()} /km²<br/>Total Flood Points: ${record.flood_points}<br/>Vulnerability: ${record.vulnerability}`;
                 }
                 layer.bindTooltip(hoverHTML, { sticky: true }).openTooltip();
             }
@@ -1347,9 +1399,9 @@
 
             let hoverHTML = `<strong>${props.tenXa}</strong> (${props.Ten_Huyen})`;
             if (currentTheme === 'env') {
-                hoverHTML += `<br/>Ward AQI: ${props.aqi}<br/>Summer LST: ${props.lst}°C`;
+                hoverHTML += `<br/>Ward AQI: ${props.aqi}<br/>Summer LST: ${props.lst}°C<br/>Green Space: ${props.green_space}%`;
             } else {
-                hoverHTML += `<br/>Density: ${props.pop_density.toLocaleString()} /km²<br/>Flood Points: ${props.flood_points}`;
+                hoverHTML += `<br/>Density: ${props.pop_density.toLocaleString()} /km²<br/>Flood Points: ${props.flood_points}<br/>Vulnerability: ${props.vulnerability}`;
             }
             layer.bindTooltip(hoverHTML, { sticky: true }).openTooltip();
         }
@@ -1417,6 +1469,22 @@
                 btnMapReset.style.display = isMetro ? 'none' : 'inline-flex';
             }
 
+            // Set Vulnerability Badge
+            const vulnBadge = document.getElementById('panel-vulnerability-badge');
+            if (vulnBadge) {
+                const vulnScore = record.vulnerability;
+                vulnBadge.innerText = `Vuln: ${vulnScore}`;
+                if (vulnScore <= 30) {
+                    vulnBadge.style.backgroundColor = '#10b981'; // Green
+                } else if (vulnScore <= 50) {
+                    vulnBadge.style.backgroundColor = '#eab308'; // Yellow/Orange
+                } else if (vulnScore <= 70) {
+                    vulnBadge.style.backgroundColor = '#f97316'; // Orange/Red
+                } else {
+                    vulnBadge.style.backgroundColor = '#ef4444'; // Red
+                }
+            }
+
             // --- Environmental Side Content ---
             const aqi = record.aqi;
             document.getElementById('env-aqi-val').innerText = aqi;
@@ -1438,10 +1506,14 @@
             }
 
             document.getElementById('env-lst-val').innerText = (selectedWardRecord ? record.lst : (isMetro ? metroTotals.lst : record.lst)) + " °C";
+            document.getElementById('env-green-val').innerText = (record.green_space ? record.green_space.toFixed(1) : "--") + " %";
             document.getElementById('env-waste-val').innerText = record.waste.toLocaleString() + " tons/day";
 
             // --- Urban Pressure Side Content ---
+            const totalPop = selectedWardRecord ? record.Dan_So : (selectedDistrictRecord ? Math.round(record.pop_density * record.Area_km2) : metroTotals.population);
+            document.getElementById('urban-pop-val').innerText = totalPop.toLocaleString() + " people";
             document.getElementById('urban-density-val').innerText = record.pop_density.toLocaleString() + " /km²";
+            document.getElementById('urban-built-val').innerText = (record.built_up ? record.built_up.toFixed(1) : "--") + " %";
             document.getElementById('urban-floods-val').innerText = record.flood_points + " points";
 
             const densityFill = document.getElementById('urban-density-fill');
@@ -1672,6 +1744,7 @@
                         <th>Annual Avg AQI</th>
                         <th>AQI Status</th>
                         <th>Avg Summer LST (°C)</th>
+                        <th>Green Space Ratio</th>
                         <th>Solid Waste (Tons/Day)</th>
                         <th>${isWardView ? 'Ward Area (km²)' : 'District Area (km²)'}</th>
                     </tr>
@@ -1707,8 +1780,9 @@
                         <td style="font-weight:700;">${d.aqi}</td>
                         <td>${statusLabel}</td>
                         <td style="color:#f97316; font-weight:600;">${d.lst}°C</td>
+                        <td style="color:#10b981; font-weight:600;">${(d.green_space || 0).toFixed(1)}%</td>
                         <td>${d.waste}</td>
-                        <td>${(isWardView ? d.Area_km2 : d.Area_km2).toFixed(2)}</td>
+                        <td>${d.Area_km2.toFixed(2)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1720,9 +1794,11 @@
                 thead.innerHTML = `
                     <tr>
                         <th>${isWardView ? 'Ward / Commune' : 'District'}</th>
+                        <th>Total Population</th>
                         <th>Population Density (/km²)</th>
+                        <th>Built-up Area Ratio</th>
                         <th>Flood Points</th>
-                        <th>Flood Risk Level</th>
+                        <th>Vulnerability</th>
                         <th>${isWardView ? 'Ward Area (km²)' : 'District Area (km²)'}</th>
                     </tr>
                 `;
@@ -1746,17 +1822,21 @@
                         tr.onclick = () => selectDistrict(d);
                     }
 
-                    let floodLevel = "";
-                    if (d.flood_points >= 8) floodLevel = `<span class="env-status-text status-severe">Critical (${d.flood_points})</span>`;
-                    else if (d.flood_points >= 3) floodLevel = `<span class="env-status-text status-unhealthy">High (${d.flood_points})</span>`;
-                    else floodLevel = `<span class="env-status-text status-good">Low (${d.flood_points})</span>`;
+                    const popVal = isWardView ? d.Dan_So : Math.round(d.pop_density * d.Area_km2);
+                    let vulnLabel = "";
+                    if (d.vulnerability <= 30) vulnLabel = `<span class="env-status-text status-good">Low (${d.vulnerability})</span>`;
+                    else if (d.vulnerability <= 50) vulnLabel = `<span class="env-status-text status-moderate">Moderate (${d.vulnerability})</span>`;
+                    else if (d.vulnerability <= 70) vulnLabel = `<span class="env-status-text status-unhealthy">High (${d.vulnerability})</span>`;
+                    else vulnLabel = `<span class="env-status-text status-severe">Critical (${d.vulnerability})</span>`;
 
                     tr.innerHTML = `
                         <td style="font-weight:600; color:#60a5fa;">${isWardView ? d.tenXa : d.District_Name}</td>
-                        <td style="font-weight:700;">${d.pop_density.toLocaleString()}</td>
+                        <td>${popVal.toLocaleString()}</td>
+                        <td>${d.pop_density.toLocaleString()}</td>
+                        <td style="color:#ea580c; font-weight:600;">${(d.built_up || 0).toFixed(1)}%</td>
                         <td>${d.flood_points}</td>
-                        <td>${floodLevel}</td>
-                        <td>${(isWardView ? d.Area_km2 : d.Area_km2).toFixed(2)}</td>
+                        <td>${vulnLabel}</td>
+                        <td>${d.Area_km2.toFixed(2)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
