@@ -1229,6 +1229,7 @@
         let selectedDistrictRecord = null; // null means metro overview
         let selectedWardRecord = null;      // null means no ward selected
         let wardsLayer = null;              // Leaflet layer for wards
+        let isDrilledToWards = false;
 
         // Leaflet base config
         const map = L.map('map', {
@@ -1467,6 +1468,54 @@
         let chartUrbanDensity = null;
         let chartUrbanScatter = null;
 
+        function getDistrictWardsData(districtCode) {
+            if (typeof hanoiWardsGeoJSON === 'undefined') return null;
+            const codeStr = String(districtCode).padStart(5, '0');
+            const wards = hanoiWardsGeoJSON.features
+                .filter(f => String(f.properties.Code_vung).padStart(5, '0') === codeStr)
+                .map(f => f.properties);
+            if (wards.length === 0) return null;
+            
+            let total_area = 0;
+            let total_pop = 0;
+            let total_aqi = 0;
+            let total_lst = 0;
+            let total_green = 0;
+            let total_built = 0;
+            let total_waste = 0;
+            let total_flood = 0;
+
+            wards.forEach(w => {
+                total_area += w.Area_km2;
+                total_pop += w.Dan_So;
+                total_aqi += w.aqi;
+                total_lst += w.lst;
+                total_green += (w.green_space * w.Area_km2);
+                total_built += (w.built_up * w.Area_km2);
+                total_waste += w.waste;
+                total_flood += w.flood_points;
+            });
+
+            const avg_aqi = Math.round(total_aqi / wards.length);
+            const avg_lst = parseFloat((total_lst / wards.length).toFixed(1));
+            const avg_green = parseFloat((total_green / total_area).toFixed(1));
+            const avg_built = parseFloat((total_built / total_area).toFixed(1));
+            const avg_density = Math.round(total_pop / total_area);
+
+            return {
+                aqi: avg_aqi,
+                lst: avg_lst,
+                green_space: avg_green,
+                built_up: avg_built,
+                waste: parseFloat(total_waste.toFixed(1)),
+                pop_density: avg_density,
+                flood_points: total_flood,
+                Dan_So: total_pop,
+                Area_km2: total_area,
+                vulnerability: calcVulnerability(avg_aqi, avg_lst, total_flood, avg_density, avg_built, avg_green)
+            };
+        }
+
         // Initialize and Update Charts
         function updateSidePanel() {
             const isMetro = !selectedDistrictRecord && !selectedWardRecord;
@@ -1475,7 +1524,7 @@
             if (selectedWardRecord) {
                 record = selectedWardRecord;
             } else if (selectedDistrictRecord) {
-                record = selectedDistrictRecord;
+                record = getDistrictWardsData(selectedDistrictRecord.Code_Vung) || selectedDistrictRecord;
             } else {
                 record = metroTotals;
             }
@@ -1483,11 +1532,11 @@
             // Set Panel Headers
             document.getElementById('panel-title').innerText = selectedWardRecord 
                 ? record.tenXa 
-                : (record.District_Name || record.name);
+                : (selectedDistrictRecord ? selectedDistrictRecord.District_Name : metroTotals.name);
                 
             document.getElementById('panel-subtitle').innerText = selectedWardRecord
                 ? `Ward of ${record.Ten_Huyen} (Code: ${record.maXa})`
-                : (isMetro ? "Aggregated metropolitan statistics" : `District Code: ${String(record.Code_Vung).padStart(5, '0')}`);
+                : (isMetro ? "Aggregated metropolitan statistics" : `District Code: ${String(selectedDistrictRecord.Code_Vung).padStart(5, '0')}`);
                 
             document.getElementById('btn-reset').style.display = isMetro ? 'none' : 'inline-flex';
             const btnMapReset = document.getElementById('btn-map-reset');
@@ -1531,12 +1580,26 @@
                 aqiStatus.classList.add("status-severe");
             }
 
-            document.getElementById('env-lst-val').innerText = (selectedWardRecord ? record.lst : (isMetro ? metroTotals.lst : record.lst)) + " °C";
-            document.getElementById('env-green-val').innerText = (record.green_space ? record.green_space.toFixed(1) : "--") + " %";
-            document.getElementById('env-waste-val').innerText = record.waste.toLocaleString() + " tons/day";
+            let parentDistData = null;
+            if (selectedWardRecord) {
+                const parentDist = districtData.find(d => String(d.Code_Vung).padStart(5, '0') === String(record.Code_vung).padStart(5, '0'));
+                if (parentDist) {
+                    parentDistData = getDistrictWardsData(parentDist.Code_Vung) || parentDist;
+                }
+            }
+
+            if (selectedWardRecord && parentDistData) {
+                document.getElementById('env-lst-val').innerHTML = `${record.lst} °C <span style="font-size:11px; color:#9ca3af; font-weight:normal; margin-left:4px;">(Dist Avg: ${parentDistData.lst} °C)</span>`;
+                document.getElementById('env-green-val').innerHTML = `${record.green_space.toFixed(1)} % <span style="font-size:11px; color:#9ca3af; font-weight:normal; margin-left:4px;">(Dist Avg: ${parentDistData.green_space.toFixed(1)} %)</span>`;
+                document.getElementById('env-waste-val').innerHTML = `${record.waste.toLocaleString()} t/d <span style="font-size:11px; color:#9ca3af; font-weight:normal; margin-left:4px;">(Dist Total: ${parentDistData.waste.toLocaleString()} t/d)</span>`;
+            } else {
+                document.getElementById('env-lst-val').innerText = (isMetro ? metroTotals.lst : record.lst) + " °C";
+                document.getElementById('env-green-val').innerText = (record.green_space ? record.green_space.toFixed(1) : "--") + " %";
+                document.getElementById('env-waste-val').innerText = record.waste.toLocaleString() + " tons/day";
+            }
 
             // --- Urban Pressure Side Content ---
-            const totalPop = selectedWardRecord ? record.Dan_So : (selectedDistrictRecord ? Math.round(record.pop_density * record.Area_km2) : metroTotals.population);
+            const totalPop = selectedWardRecord ? record.Dan_So : (selectedDistrictRecord ? record.Dan_So : metroTotals.population);
             document.getElementById('urban-pop-val').innerText = totalPop.toLocaleString() + " people";
             document.getElementById('urban-density-val').innerText = record.pop_density.toLocaleString() + " /km²";
             document.getElementById('urban-built-val').innerText = (record.built_up ? record.built_up.toFixed(1) : "--") + " %";
@@ -1610,30 +1673,47 @@
                     }];
                     breakdownCount.innerText = `1 Ward`;
                 } else if (selectedDistrictRecord) {
-                    const distRecord = selectedDistrictRecord;
-                    if (distRecord && typeof hanoiWardsGeoJSON !== 'undefined') {
-                        const codeStr = String(distRecord.Code_Vung).padStart(5, '0');
-                        breakdownLabel.innerHTML = `<i class="fa-solid fa-list-check"></i> Wards of ${distRecord.District_Name}`;
-                        
-                        const filteredWards = hanoiWardsGeoJSON.features
-                            .filter(f => String(f.properties.Code_vung).padStart(5, '0') === codeStr)
-                            .map(f => f.properties);
-                        
-                        // Sort by name
-                        filteredWards.sort((a, b) => a.tenXa.localeCompare(b.tenXa));
-                        
-                        listData = filteredWards.map(w => ({
-                            id: w.maXa,
-                            name: w.tenXa,
-                            aqi: w.aqi,
-                            lst: w.lst,
-                            green_space: w.green_space,
-                            waste: w.waste,
-                            Area_km2: w.Area_km2,
-                            vulnerability: w.vulnerability,
-                            raw: w
-                        }));
-                        breakdownCount.innerText = `${listData.length} Wards`;
+                    if (!isDrilledToWards) {
+                        breakdownLabel.innerHTML = `<i class="fa-solid fa-map-location-dot"></i> District Summary`;
+                        const distWardsData = getDistrictWardsData(selectedDistrictRecord.Code_Vung) || selectedDistrictRecord;
+                        listData = [{
+                            id: selectedDistrictRecord.Code_Vung,
+                            name: selectedDistrictRecord.District_Name,
+                            aqi: distWardsData.aqi,
+                            lst: distWardsData.lst,
+                            green_space: distWardsData.green_space,
+                            waste: distWardsData.waste,
+                            Area_km2: distWardsData.Area_km2,
+                            vulnerability: distWardsData.vulnerability,
+                            raw: selectedDistrictRecord
+                        }];
+                        breakdownCount.innerText = `1 District`;
+                    } else {
+                        const distRecord = selectedDistrictRecord;
+                        if (distRecord && typeof hanoiWardsGeoJSON !== 'undefined') {
+                            const codeStr = String(distRecord.Code_Vung).padStart(5, '0');
+                            breakdownLabel.innerHTML = `<i class="fa-solid fa-list-check"></i> Wards of ${distRecord.District_Name}`;
+                            
+                            const filteredWards = hanoiWardsGeoJSON.features
+                                .filter(f => String(f.properties.Code_vung).padStart(5, '0') === codeStr)
+                                .map(f => f.properties);
+                            
+                            // Sort by name
+                            filteredWards.sort((a, b) => a.tenXa.localeCompare(b.tenXa));
+                            
+                            listData = filteredWards.map(w => ({
+                                id: w.maXa,
+                                name: w.tenXa,
+                                aqi: w.aqi,
+                                lst: w.lst,
+                                green_space: w.green_space,
+                                waste: w.waste,
+                                Area_km2: w.Area_km2,
+                                vulnerability: w.vulnerability,
+                                raw: w
+                            }));
+                            breakdownCount.innerText = `${listData.length} Wards`;
+                        }
                     }
                 }
 
@@ -1645,6 +1725,8 @@
                     if (isMetro) {
                         isSelected = false;
                     } else if (selectedWardRecord && item.id === selectedWardRecord.maXa) {
+                        isSelected = true;
+                    } else if (selectedDistrictRecord && !isDrilledToWards && item.id === selectedDistrictRecord.Code_Vung) {
                         isSelected = true;
                     }
 
@@ -1665,6 +1747,8 @@
                                     }
                                 });
                             }
+                        } else if (selectedDistrictRecord && !isDrilledToWards) {
+                            // Do nothing or toggle
                         } else {
                             selectedWardRecord = item.raw;
                             if (wardsLayer) {
@@ -1695,7 +1779,19 @@
                     `;
                     breakdownList.appendChild(row);
                 });
+
+                if (selectedDistrictRecord && !isDrilledToWards) {
+                    const btn = document.createElement('button');
+                    btn.id = 'btn-drilldown-wards';
+                    btn.style.cssText = 'width: 100%; margin-top: 10px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); padding: 8px; border-radius: 6px; color: #60a5fa; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;';
+                    btn.innerHTML = `<i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down to Wards (Chi tiết Phường/Xã)`;
+                    btn.onmouseover = () => { btn.style.background = 'rgba(59, 130, 246, 0.3)'; };
+                    btn.onmouseout = () => { btn.style.background = 'rgba(59, 130, 246, 0.2)'; };
+                    btn.onclick = drillDownToWards;
+                    breakdownList.appendChild(btn);
+                }
             }
+        }
         }
 
         // Initialize Main Section Tab Charts
@@ -1710,7 +1806,7 @@
             let chartDataSrc = districtData.map(d => ({ name: d.District_Name, lst: d.lst, waste: d.waste, pop_density: d.pop_density, flood_points: d.flood_points }));
             let isWardView = false;
             
-            if (selectedDistrictRecord && typeof hanoiWardsGeoJSON !== 'undefined') {
+            if (selectedDistrictRecord && isDrilledToWards && typeof hanoiWardsGeoJSON !== 'undefined') {
                 const codeStr = String(selectedDistrictRecord.Code_Vung).padStart(5, '0');
                 const wards = hanoiWardsGeoJSON.features
                     .filter(f => String(f.properties.Code_vung).padStart(5, '0') === codeStr)
@@ -1878,7 +1974,7 @@
             let dataSrc = districtData;
             let isWardView = false;
             
-            if (selectedDistrictRecord && typeof hanoiWardsGeoJSON !== 'undefined') {
+            if (selectedDistrictRecord && isDrilledToWards && typeof hanoiWardsGeoJSON !== 'undefined') {
                 const codeStr = String(selectedDistrictRecord.Code_Vung).padStart(5, '0');
                 dataSrc = hanoiWardsGeoJSON.features
                     .filter(f => String(f.properties.Code_vung).padStart(5, '0') === codeStr)
@@ -2123,6 +2219,7 @@
         function selectDistrict(record) {
             selectedDistrictRecord = record;
             selectedWardRecord = null;
+            isDrilledToWards = false;
 
             if (!record) {
                 // Reset/Clear action: Show district overview map
@@ -2138,29 +2235,57 @@
                 }
                 map.setView([21.01, 105.78], 10);
             } else {
-                // Drill down action: Hide district map, show ward boundaries of selected district
-                if (geojsonLayer && map.hasLayer(geojsonLayer)) {
-                    map.removeLayer(geojsonLayer);
+                // Highlight selected district and zoom to bounds
+                if (geojsonLayer) {
+                    geojsonLayer.setStyle(f => {
+                        const isSelected = String(f.properties.Code_vung).padStart(5, '0') === String(record.Code_Vung).padStart(5, '0');
+                        return {
+                            fillColor: styleFeature(f).fillColor,
+                            weight: isSelected ? 3.5 : 1,
+                            color: isSelected ? '#3b82f6' : 'rgba(255,255,255,0.15)',
+                            fillOpacity: isSelected ? 0.6 : 0.25
+                        };
+                    });
+                    
+                    geojsonLayer.eachLayer(layer => {
+                        if (String(layer.feature.properties.Code_vung).padStart(5, '0') === String(record.Code_Vung).padStart(5, '0')) {
+                            map.fitBounds(layer.getBounds());
+                        }
+                    });
                 }
-                if (wardsLayer) {
-                    map.removeLayer(wardsLayer);
-                }
-
-                const codeStr = String(record.Code_Vung).padStart(5, '0');
-                const filteredFeatures = hanoiWardsGeoJSON.features.filter(f => 
-                    String(f.properties.Code_vung).padStart(5, '0') === codeStr
-                );
-
-                const filteredGeoJSON = {
-                    type: "FeatureCollection",
-                    features: filteredFeatures
-                };
-
-                wardsLayer = L.geoJSON(filteredGeoJSON, {
-                    style: styleWardFeature,
-                    onEachFeature: onEachWardFeature
-                }).addTo(map);
             }
+
+            updateSidePanel();
+            initMainCharts();
+            renderTable();
+        }
+
+        function drillDownToWards() {
+            if (!selectedDistrictRecord) return;
+            isDrilledToWards = true;
+
+            // Hide district map, show ward boundaries of selected district
+            if (geojsonLayer && map.hasLayer(geojsonLayer)) {
+                map.removeLayer(geojsonLayer);
+            }
+            if (wardsLayer) {
+                map.removeLayer(wardsLayer);
+            }
+
+            const codeStr = String(selectedDistrictRecord.Code_Vung).padStart(5, '0');
+            const filteredFeatures = hanoiWardsGeoJSON.features.filter(f => 
+                String(f.properties.Code_vung).padStart(5, '0') === codeStr
+            );
+
+            const filteredGeoJSON = {
+                type: "FeatureCollection",
+                features: filteredFeatures
+            };
+
+            wardsLayer = L.geoJSON(filteredGeoJSON, {
+                style: styleWardFeature,
+                onEachFeature: onEachWardFeature
+            }).addTo(map);
 
             updateSidePanel();
             initMainCharts();
