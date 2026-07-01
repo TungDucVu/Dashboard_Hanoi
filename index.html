@@ -341,20 +341,26 @@
         }
 
         .btn-reset-selection {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--card-border);
-            color: var(--text-muted);
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 4px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #60a5fa;
+            font-size: 11px;
+            padding: 6px 12px;
+            border-radius: 6px;
             cursor: pointer;
             text-transform: uppercase;
             font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
         }
 
         .btn-reset-selection:hover {
             color: #ffffff;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(59, 130, 246, 0.3);
+            border-color: #3b82f6;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
         }
 
         .panel-content-tab {
@@ -917,8 +923,9 @@
                         <h3 id="panel-title" class="panel-title">Hanoi Overview</h3>
                         <p id="panel-subtitle" class="panel-subtitle">Aggregated metropolitan statistics</p>
                     </div>
-                    <button id="btn-reset" class="btn-reset-selection" onclick="selectDistrict(null)"
-                        style="display:none;">Clear</button>
+                    <button id="btn-reset" class="btn-reset-selection" onclick="selectDistrict(null)" style="display:none;">
+                        <i class="fa-solid fa-arrow-left"></i> Reset
+                    </button>
                 </div>
 
                 <!-- Dynamic Content for Tab 2: Environmental Quality -->
