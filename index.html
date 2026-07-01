@@ -375,6 +375,21 @@
             transition: all 0.2s ease;
         }
 
+        #side-ward-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        #side-ward-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+        }
+        #side-ward-list::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.3);
+            border-radius: 4px;
+        }
+        #side-ward-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.5);
+        }
+
         .panel-content-tab {
             display: none;
             flex-direction: column;
@@ -1008,6 +1023,17 @@
                     </div>
                 </div>
 
+                <!-- Ward Breakdown Section inside Side Panel -->
+                <div id="side-ward-breakdown" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px;">
+                    <h4 id="side-breakdown-title" style="font-size: 14px; margin-bottom: 10px; color: #60a5fa; display: flex; align-items: center; justify-content: space-between;">
+                        <span id="side-breakdown-label"><i class="fa-solid fa-list-check"></i> Ward Breakdown</span>
+                        <span id="side-breakdown-count" style="font-size: 11px; background: rgba(59,130,246,0.2); padding: 1px 6px; border-radius: 10px; color: #93c5fd;">-- Wards</span>
+                    </h4>
+                    <div id="side-ward-list" style="max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+                        <!-- Dynamically generated rows -->
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -1542,6 +1568,109 @@
             } else {
                 floodWarning.style.display = 'block';
                 floodWarning.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#10b981"></i> <strong>Low Flood Danger:</strong> Only ${record.flood_points} hotspots.`;
+            }
+
+            // Update Side Ward/District Breakdown List
+            const breakdownLabel = document.getElementById('side-breakdown-label');
+            const breakdownCount = document.getElementById('side-breakdown-count');
+            const breakdownList = document.getElementById('side-ward-list');
+
+            if (breakdownList) {
+                breakdownList.innerHTML = '';
+                
+                let listData = [];
+                let isDistrictLevel = false;
+
+                if (isMetro) {
+                    breakdownLabel.innerHTML = `<i class="fa-solid fa-map-location-dot"></i> District Breakdown`;
+                    listData = districtData.map(d => ({
+                        id: d.Code_Vung,
+                        name: d.District_Name,
+                        aqi: d.aqi,
+                        vulnerability: d.vulnerability,
+                        raw: d
+                    }));
+                    breakdownCount.innerText = `${listData.length} Districts`;
+                } else {
+                    const distRecord = selectedDistrictRecord || districtData.find(d => String(d.Code_Vung).padStart(5, '0') === String(record.Code_vung).padStart(5, '0'));
+                    if (distRecord && typeof hanoiWardsGeoJSON !== 'undefined') {
+                        const codeStr = String(distRecord.Code_Vung).padStart(5, '0');
+                        breakdownLabel.innerHTML = `<i class="fa-solid fa-list-check"></i> Wards of ${distRecord.District_Name}`;
+                        
+                        const filteredWards = hanoiWardsGeoJSON.features
+                            .filter(f => String(f.properties.Code_vung).padStart(5, '0') === codeStr)
+                            .map(f => f.properties);
+                        
+                        // Sort by name
+                        filteredWards.sort((a, b) => a.tenXa.localeCompare(b.tenXa));
+                        
+                        listData = filteredWards.map(w => ({
+                            id: w.maXa,
+                            name: w.tenXa,
+                            aqi: w.aqi,
+                            vulnerability: w.vulnerability,
+                            raw: w
+                        }));
+                        breakdownCount.innerText = `${listData.length} Wards`;
+                        isDistrictLevel = true;
+                    }
+                }
+
+                listData.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'side-ward-row';
+                    
+                    let isSelected = false;
+                    if (isMetro) {
+                        isSelected = false;
+                    } else if (selectedWardRecord && item.id === selectedWardRecord.maXa) {
+                        isSelected = true;
+                    }
+
+                    row.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: ${isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${isSelected ? 'rgba(59, 130, 246, 0.4)' : 'transparent'}; border-radius: 4px; cursor: pointer; transition: all 0.2s; font-size: 12px;`;
+                    
+                    row.onmouseover = () => { row.style.background = 'rgba(59, 130, 246, 0.1)'; };
+                    row.onmouseout = () => { 
+                        row.style.background = isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.03)'; 
+                    };
+
+                    row.onclick = () => {
+                        if (isMetro) {
+                            selectDistrict(item.raw);
+                            if (geojsonLayer) {
+                                geojsonLayer.eachLayer(layer => {
+                                    if (String(layer.feature.properties.Code_vung).padStart(5, '0') === String(item.id).padStart(5, '0')) {
+                                        map.fitBounds(layer.getBounds());
+                                    }
+                                });
+                            }
+                        } else {
+                            selectedWardRecord = item.raw;
+                            if (wardsLayer) {
+                                wardsLayer.setStyle(styleWardFeature);
+                            }
+                            updateSidePanel();
+                            renderTable();
+                        }
+                    };
+
+                    let badgeHTML = '';
+                    if (currentTheme === 'env') {
+                        badgeHTML = `<span style="font-weight: 600; color: #60a5fa;">AQI ${item.aqi}</span>`;
+                    } else {
+                        let vulnColor = '#10b981';
+                        if (item.vulnerability > 70) vulnColor = '#ef4444';
+                        else if (item.vulnerability > 50) vulnColor = '#f97316';
+                        else if (item.vulnerability > 30) vulnColor = '#eab308';
+                        badgeHTML = `<span style="font-weight: 700; color: ${vulnColor};">Vuln ${item.vulnerability}</span>`;
+                    }
+
+                    row.innerHTML = `
+                        <span style="color: #e2e8f0; font-weight: 500;">${item.name}</span>
+                        ${badgeHTML}
+                    `;
+                    breakdownList.appendChild(row);
+                });
             }
         }
 
