@@ -2036,15 +2036,6 @@
                 if (!response.ok) throw new Error("Metrics file not found or inaccessible");
                 const realtime = await response.json();
                 
-                // Update metropolitan metrics
-                if (realtime.metro) {
-                    if (realtime.metro.aqi !== undefined) metroTotals.aqi = realtime.metro.aqi;
-                    if (realtime.metro.lst !== undefined) metroTotals.lst = realtime.metro.lst.toFixed(1);
-                    // Also store other live weather values in metroTotals
-                    if (realtime.metro.air_temp !== undefined) metroTotals.air_temp = realtime.metro.air_temp;
-                    if (realtime.metro.rain_mm !== undefined) metroTotals.rain_mm = realtime.metro.rain_mm;
-                }
-                
                 // Update district-specific metrics
                 if (realtime.districts) {
                     for (const [name, metrics] of Object.entries(realtime.districts)) {
@@ -2053,7 +2044,87 @@
                             if (metrics.aqi !== undefined) record.aqi = metrics.aqi;
                             if (metrics.lst !== undefined) record.lst = metrics.lst;
                             if (metrics.flood_points !== undefined) record.flood_points = metrics.flood_points;
+                            record.vulnerability = calcVulnerability(record.aqi, record.lst, record.flood_points, record.pop_density, record.built_up, record.green_space);
                         }
+                    }
+                }
+
+                // Update metropolitan metrics
+                if (realtime.metro) {
+                    if (realtime.metro.aqi !== undefined) metroTotals.aqi = realtime.metro.aqi;
+                    if (realtime.metro.lst !== undefined) metroTotals.lst = realtime.metro.lst.toFixed(1);
+                    if (realtime.metro.air_temp !== undefined) metroTotals.air_temp = realtime.metro.air_temp;
+                    if (realtime.metro.rain_mm !== undefined) metroTotals.rain_mm = realtime.metro.rain_mm;
+                }
+                
+                // Recompute metro totals/averages based on updated district data
+                let total_area = 0;
+                let total_aqi = 0;
+                let total_lst = 0;
+                let total_flood = 0;
+                let total_pop = 0;
+                let total_green = 0;
+                let total_built = 0;
+                
+                districtData.forEach(d => {
+                    total_area += d.Area_km2;
+                    total_aqi += d.aqi;
+                    total_lst += d.lst;
+                    total_flood += d.flood_points;
+                    total_pop += (d.pop_density * d.Area_km2);
+                    total_green += (d.green_space * d.Area_km2);
+                    total_built += (d.built_up * d.Area_km2);
+                });
+                
+                metroTotals.aqi = Math.round(total_aqi / districtData.length);
+                metroTotals.lst = (total_lst / districtData.length).toFixed(1);
+                metroTotals.flood_points = total_flood;
+                metroTotals.population = total_pop;
+                metroTotals.pop_density = Math.round(total_pop / total_area);
+                metroTotals.green_space = Math.round(total_green / total_area);
+                metroTotals.built_up = Math.round(total_built / total_area);
+                metroTotals.vulnerability = calcVulnerability(metroTotals.aqi, parseFloat(metroTotals.lst), metroTotals.flood_points, metroTotals.pop_density, metroTotals.built_up, metroTotals.green_space);
+
+                // Update ward features dynamically in the browser
+                if (typeof hanoiWardsGeoJSON !== 'undefined' && hanoiWardsGeoJSON.features) {
+                    const wardsByDistrict = {};
+                    hanoiWardsGeoJSON.features.forEach(f => {
+                        const code = String(f.properties.Code_vung).padStart(5, '0');
+                        if (!wardsByDistrict[code]) wardsByDistrict[code] = [];
+                        wardsByDistrict[code].push(f.properties);
+                    });
+
+                    for (const code in wardsByDistrict) {
+                        const wards = wardsByDistrict[code];
+                        const distRecord = districtData.find(d => String(d.Code_Vung).padStart(5, '0') === code);
+                        if (!distRecord) continue;
+
+                        const total_pop_wards = wards.reduce((sum, w) => sum + w.Dan_So, 0);
+                        const total_area_wards = wards.reduce((sum, w) => sum + w.Area_km2, 0);
+                        const avg_density = total_area_wards > 0 ? (total_pop_wards / total_area_wards) : 1;
+
+                        // Sort wards by pop_density descending to distribute flood points
+                        wards.sort((a, b) => b.pop_density - a.pop_density);
+                        const num_wards = wards.length;
+                        
+                        wards.forEach(w => {
+                            w.flood_points = 0;
+                        });
+                        for (let i = 0; i < distRecord.flood_points; i++) {
+                            const idx = i % num_wards;
+                            wards[idx].flood_points += 1;
+                        }
+
+                        wards.forEach(w => {
+                            const dens_ratio = avg_density > 0 ? Math.max(0.85, Math.min(1.15, w.pop_density / avg_density)) : 1;
+                            w.aqi = Math.round(distRecord.aqi * dens_ratio);
+                            w.lst = parseFloat((distRecord.lst + (dens_ratio - 1.0) * 3.0).toFixed(1));
+                            w.green_space = parseFloat((distRecord.green_space * (1.0 / Math.pow(dens_ratio, 0.35))).toFixed(1));
+                            w.green_space = Math.max(5.0, Math.min(95.0, w.green_space));
+                            w.built_up = parseFloat((distRecord.built_up * Math.pow(dens_ratio, 0.25)).toFixed(1));
+                            w.built_up = Math.max(5.0, Math.min(98.0, w.built_up));
+                            w.vulnerability = calcVulnerability(w.aqi, w.lst, w.flood_points, w.pop_density, w.built_up, w.green_space);
+                        });
                     }
                 }
                 
