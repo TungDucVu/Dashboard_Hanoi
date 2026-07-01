@@ -909,10 +909,15 @@
         <div class="map-section">
             <div class="map-wrapper">
                 <div class="map-header">
-                    <h3 class="map-title" id="map-title-text"><i class="fa-solid fa-wind"></i> Air Quality Index (AQI) Choropleth Map</h3>
-                    <div style="font-size: 11px; color: var(--text-muted);">
-                        <i class="fa-solid fa-circle-info"></i> Click or hover on districts to see local statistics
+                    <div>
+                        <h3 class="map-title" id="map-title-text"><i class="fa-solid fa-wind"></i> Air Quality Index (AQI) Choropleth Map</h3>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            <i class="fa-solid fa-circle-info"></i> Click or hover on districts to see local statistics
+                        </div>
                     </div>
+                    <button id="btn-map-reset" class="btn-reset-selection" onclick="selectDistrict(null)" style="display: none;">
+                        <i class="fa-solid fa-arrow-left"></i> Reset Map View
+                    </button>
                 </div>
                 <div id="map" class="map-container"></div>
             </div>
@@ -1406,7 +1411,11 @@
                 ? `Ward of ${record.Ten_Huyen} (Code: ${record.maXa})`
                 : (isMetro ? "Aggregated metropolitan statistics" : `District Code: ${String(record.Code_Vung).padStart(5, '0')}`);
                 
-            document.getElementById('btn-reset').style.display = isMetro ? 'none' : 'block';
+            document.getElementById('btn-reset').style.display = isMetro ? 'none' : 'inline-flex';
+            const btnMapReset = document.getElementById('btn-map-reset');
+            if (btnMapReset) {
+                btnMapReset.style.display = isMetro ? 'none' : 'inline-flex';
+            }
 
             // --- Environmental Side Content ---
             const aqi = record.aqi;
