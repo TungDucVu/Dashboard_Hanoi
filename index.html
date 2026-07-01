@@ -1595,8 +1595,22 @@
                         raw: d
                     }));
                     breakdownCount.innerText = `${listData.length} Districts`;
-                } else {
-                    const distRecord = selectedDistrictRecord || districtData.find(d => String(d.Code_Vung).padStart(5, '0') === String(record.Code_vung).padStart(5, '0'));
+                } else if (selectedWardRecord) {
+                    breakdownLabel.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> Selected Ward`;
+                    listData = [{
+                        id: selectedWardRecord.maXa,
+                        name: selectedWardRecord.tenXa,
+                        aqi: selectedWardRecord.aqi,
+                        lst: selectedWardRecord.lst,
+                        green_space: selectedWardRecord.green_space,
+                        waste: selectedWardRecord.waste,
+                        Area_km2: selectedWardRecord.Area_km2,
+                        vulnerability: selectedWardRecord.vulnerability,
+                        raw: selectedWardRecord
+                    }];
+                    breakdownCount.innerText = `1 Ward`;
+                } else if (selectedDistrictRecord) {
+                    const distRecord = selectedDistrictRecord;
                     if (distRecord && typeof hanoiWardsGeoJSON !== 'undefined') {
                         const codeStr = String(distRecord.Code_Vung).padStart(5, '0');
                         breakdownLabel.innerHTML = `<i class="fa-solid fa-list-check"></i> Wards of ${distRecord.District_Name}`;
@@ -1620,7 +1634,6 @@
                             raw: w
                         }));
                         breakdownCount.innerText = `${listData.length} Wards`;
-                        isDistrictLevel = true;
                     }
                 }
 
