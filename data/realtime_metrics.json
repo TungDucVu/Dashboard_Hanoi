@@ -1,9 +1,9 @@
 {
-    "last_updated": "2026-07-07T19:44:49.592875+00:00",
+    "last_updated": "2026-07-07T21:17:02.695724+00:00",
     "metro": {
         "aqi": 75,
         "lst": 25.5,
-        "air_temp": 25.4,
+        "air_temp": 25.5,
         "rain_mm": 0.0
     },
     "districts": {
