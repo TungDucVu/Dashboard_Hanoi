@@ -53,31 +53,47 @@ def fetch_aqi():
         log("WAQI_API_TOKEN not found. Using fallback mock API data.")
         return 115 # typical Hanoi average
     
-    # Try multiple endpoints (city feed first, then geo coordinate feed)
-    # City-wide feeds are more reliable than geo coordinates because geo lookup
-    # might match a private indoor sensor (showing very low AQI like 10)
+    # List of candidate stations in Hanoi
     endpoints = [
+        "https://api.waqi.info/feed/vietnam/hanoi/us-embassy/",
+        "https://api.waqi.info/feed/vietnam/hanoi/french-embassy/",
+        "https://api.waqi.info/feed/vietnam/hanoi/chi-cuc-bvmt-hanoi/",
         "https://api.waqi.info/feed/vietnam/hanoi/",
-        "https://api.waqi.info/feed/hanoi/",
         f"https://api.waqi.info/feed/geo:{HANOI_LAT};{HANOI_LON}/"
     ]
+    
+    valid_aqis = []
     
     for base_url in endpoints:
         try:
             url = f"{base_url}?token={token}"
-            log(f"Fetching AQI from: {base_url} (token masked)")
             response = requests.get(url, timeout=10)
             data = response.json()
             if data.get("status") == "ok":
                 aqi = data["data"]["aqi"]
                 city_name = data["data"].get("city", {}).get("name", "Unknown Station")
-                log(f"Successfully fetched live AQI from {city_name}: {aqi}")
-                log(f"Station Details: {json.dumps(data['data'].get('city'))}")
-                return aqi
+                if isinstance(aqi, (int, float)):
+                    log(f"Fetched AQI from {city_name}: {aqi}")
+                    valid_aqis.append((aqi, city_name))
+                else:
+                    log(f"Station {city_name} returned non-numeric AQI: {aqi}")
             else:
-                log(f"Endpoint {base_url} returned status: {data.get('status')}. Info: {data.get('data')}")
+                log(f"Endpoint {base_url} returned status: {data.get('status')}")
         except Exception as e:
             log(f"Error fetching from {base_url}: {e}")
+            
+    if valid_aqis:
+        # Filter out unusually low readings (like <= 15) which usually indicate
+        # malfunctioning or indoor sensors, unless all readings are low.
+        realistic_aqis = [item for item in valid_aqis if item[0] > 15]
+        if realistic_aqis:
+            selected_aqi, selected_name = max(realistic_aqis, key=lambda x: x[0])
+            log(f"Selected realistic AQI {selected_aqi} from {selected_name}")
+            return selected_aqi
+        else:
+            selected_aqi, selected_name = max(valid_aqis, key=lambda x: x[0])
+            log(f"All stations returned low values. Selected AQI {selected_aqi} from {selected_name}")
+            return selected_aqi
             
     log("All AQI endpoints failed. Using fallback mock data.")
     return 115
