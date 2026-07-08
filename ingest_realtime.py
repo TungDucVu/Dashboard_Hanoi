@@ -47,16 +47,33 @@ def fetch_aqi():
         print("WAQI_API_TOKEN not found. Using fallback mock API data.")
         return 115 # typical Hanoi average
     
-    try:
-        url = f"https://api.waqi.info/feed/geo:{HANOI_LAT};{HANOI_LON}/?token={token}"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        if data.get("status") == "ok":
-            aqi = data["data"]["aqi"]
-            print(f"Successfully fetched live AQI: {aqi}")
-            return aqi
-    except Exception as e:
-        print(f"Error fetching AQI: {e}. Using fallback mock data.")
+    # Try multiple endpoints (city feed first, then geo coordinate feed)
+    # City-wide feeds are more reliable than geo coordinates because geo lookup
+    # might match a private indoor sensor (showing very low AQI like 10)
+    endpoints = [
+        "https://api.waqi.info/feed/vietnam/hanoi/",
+        "https://api.waqi.info/feed/hanoi/",
+        f"https://api.waqi.info/feed/geo:{HANOI_LAT};{HANOI_LON}/"
+    ]
+    
+    for base_url in endpoints:
+        try:
+            url = f"{base_url}?token={token}"
+            print(f"Fetching AQI from: {base_url} (token masked)")
+            response = requests.get(url, timeout=10)
+            data = response.json()
+            if data.get("status") == "ok":
+                aqi = data["data"]["aqi"]
+                city_name = data["data"].get("city", {}).get("name", "Unknown Station")
+                print(f"Successfully fetched live AQI from {city_name}: {aqi}")
+                print(f"Station Details: {data['data'].get('city')}")
+                return aqi
+            else:
+                print(f"Endpoint {base_url} returned status: {data.get('status')}")
+        except Exception as e:
+            print(f"Error fetching from {base_url}: {e}")
+            
+    print("All AQI endpoints failed. Using fallback mock data.")
     return 115
 
 def fetch_weather():
