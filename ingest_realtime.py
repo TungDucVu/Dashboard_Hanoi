@@ -40,11 +40,17 @@ DISTRICT_BASELINES = {
     "Ung Hoa": {"pop_density": 1200, "base_aqi_factor": 0.74},
     "My Duc": {"pop_density": 950, "base_aqi_factor": 0.66}
 }
+debug_logs = []
+
+def log(msg):
+    # Print to console (for actions output) and append to debug_logs
+    print(msg)
+    debug_logs.append(msg)
 
 def fetch_aqi():
     token = os.getenv("WAQI_API_TOKEN")
     if not token:
-        print("WAQI_API_TOKEN not found. Using fallback mock API data.")
+        log("WAQI_API_TOKEN not found. Using fallback mock API data.")
         return 115 # typical Hanoi average
     
     # Try multiple endpoints (city feed first, then geo coordinate feed)
@@ -59,21 +65,21 @@ def fetch_aqi():
     for base_url in endpoints:
         try:
             url = f"{base_url}?token={token}"
-            print(f"Fetching AQI from: {base_url} (token masked)")
+            log(f"Fetching AQI from: {base_url} (token masked)")
             response = requests.get(url, timeout=10)
             data = response.json()
             if data.get("status") == "ok":
                 aqi = data["data"]["aqi"]
                 city_name = data["data"].get("city", {}).get("name", "Unknown Station")
-                print(f"Successfully fetched live AQI from {city_name}: {aqi}")
-                print(f"Station Details: {data['data'].get('city')}")
+                log(f"Successfully fetched live AQI from {city_name}: {aqi}")
+                log(f"Station Details: {json.dumps(data['data'].get('city'))}")
                 return aqi
             else:
-                print(f"Endpoint {base_url} returned status: {data.get('status')}")
+                log(f"Endpoint {base_url} returned status: {data.get('status')}. Info: {data.get('data')}")
         except Exception as e:
-            print(f"Error fetching from {base_url}: {e}")
+            log(f"Error fetching from {base_url}: {e}")
             
-    print("All AQI endpoints failed. Using fallback mock data.")
+    log("All AQI endpoints failed. Using fallback mock data.")
     return 115
 
 def fetch_weather():
@@ -88,14 +94,14 @@ def fetch_weather():
         soil_temp = current.get("soil_temperature_0cm", 34.0)
         rain = current.get("rain", 0.0)
         
-        print(f"Successfully fetched weather: Temp={temp}°C, SoilTemp={soil_temp}°C, Rain={rain}mm")
+        log(f"Successfully fetched weather: Temp={temp}°C, SoilTemp={soil_temp}°C, Rain={rain}mm")
         return {
             "air_temp": temp,
             "soil_temp": soil_temp,
             "rain": rain
         }
     except Exception as e:
-        print(f"Error fetching weather: {e}. Using fallback mock data.")
+        log(f"Error fetching weather: {e}. Using fallback mock data.")
         return {
             "air_temp": 32.0,
             "soil_temp": 34.0,
@@ -146,7 +152,8 @@ def main():
             "air_temp": weather["air_temp"],
             "rain_mm": weather["rain"]
         },
-        "districts": districts_realtime
+        "districts": districts_realtime,
+        "debug_logs": debug_logs
     }
     
     # Save file
@@ -157,7 +164,7 @@ def main():
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=4, ensure_ascii=False)
         
-    print(f"Successfully updated realtime data at {file_path}")
+    log(f"Successfully updated realtime data at {file_path}")
 
 if __name__ == "__main__":
     main()
