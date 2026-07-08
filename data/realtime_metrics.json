@@ -1,5 +1,5 @@
 {
-    "last_updated": "2026-07-08T09:35:01.740697+00:00",
+    "last_updated": "2026-07-08T09:40:36.686510+00:00",
     "metro": {
         "aqi": 10,
         "lst": 28.2,
@@ -159,9 +159,12 @@
         }
     },
     "debug_logs": [
-        "Fetching AQI from: https://api.waqi.info/feed/vietnam/hanoi/ (token masked)",
-        "Successfully fetched live AQI from Hanoi, Vietnam (Hà Nội): 10",
-        "Station Details: {\"geo\": [21.0491, 105.8831], \"name\": \"Hanoi, Vietnam (H\\u00e0 N\\u1ed9i)\", \"url\": \"https://aqicn.org/city/vietnam/hanoi\", \"location\": \"\"}",
+        "Station Hanoi US Embassy, Vietnam (Đại sứ quán Mỹ, Hà Nội) returned non-numeric AQI: -",
+        "Endpoint https://api.waqi.info/feed/vietnam/hanoi/french-embassy/ returned status: error",
+        "Endpoint https://api.waqi.info/feed/vietnam/hanoi/chi-cuc-bvmt-hanoi/ returned status: error",
+        "Fetched AQI from Hanoi, Vietnam (Hà Nội): 10",
+        "Fetched AQI from Hanoi, Vietnam (Hà Nội): 10",
+        "All stations returned low values. Selected AQI 10 from Hanoi, Vietnam (Hà Nội)",
         "Successfully fetched weather: Temp=28.1°C, SoilTemp=28.2°C, Rain=0.1mm"
     ]
 }
